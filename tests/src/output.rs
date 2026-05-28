@@ -16,11 +16,13 @@ use typst::model::ParbreakElem;
 use typst::text::SpaceElem;
 use typst::visualize::Color;
 use typst_bundle::{BundleOptions, VirtualFs};
-use typst_html::HtmlDocument;
+use typst_html::{HtmlDocument, HtmlOptions};
 use typst_layout::PagedDocument;
 use typst_pdf::{PdfOptions, PdfStandard, PdfStandards};
+use typst_render::RenderOptions;
 use typst_svg::SvgOptions;
 use typst_syntax::Span;
+use typst_utils::Scalar;
 
 use crate::collect::{Test, TestOutput};
 use crate::report::{Diff, File, Old, ReportFile};
@@ -437,7 +439,8 @@ impl OutputType for Html {
     }
 
     fn make_live(_: &Test, doc: &Self::Doc) -> SourceResult<Self::Live> {
-        typst_html::html(doc)
+        let options = HtmlOptions { pretty: true };
+        typst_html::html(doc, &options)
     }
 
     fn save_live(_: &Self::Doc, live: &Self::Live) -> impl AsRef<[u8]> {
@@ -476,8 +479,13 @@ impl OutputType for Bundle {
     fn make_live(test: &Test, doc: &Self::Doc) -> SourceResult<Self::Live> {
         let standards = PdfStandards::new(test.attrs.pdf_standard.as_slice()).unwrap();
         let options = BundleOptions {
-            pixel_per_pt: 1.0,
+            html: HtmlOptions { pretty: true },
             pdf: PdfOptions { standards, ..Default::default() },
+            png: RenderOptions {
+                pixel_per_pt: Scalar::new(1.0),
+                ..Default::default()
+            },
+            svg: SvgOptions::default(),
         };
         typst_bundle::export(doc, &options)
     }
@@ -569,7 +577,10 @@ fn render(document: &PagedDocument, pixel_per_pt: f32) -> sk::Pixmap {
     }
 
     let gap = Abs::pt(1.0);
-    let opts = typst_render::RenderOptions { pixel_per_pt, render_bleed: false };
+    let opts = typst_render::RenderOptions {
+        pixel_per_pt: Scalar::new(pixel_per_pt as f64),
+        render_bleed: false,
+    };
     let mut pixmap =
         typst_render::render_merged(document, &opts, gap, Some(Color::BLACK));
 
